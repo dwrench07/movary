@@ -30,6 +30,7 @@ class MovieCatalogController
         'hi' => 'Hindi', 'pt' => 'Portuguese', 'ru' => 'Russian', 'ar' => 'Arabic',
         'tr' => 'Turkish', 'sv' => 'Swedish', 'nl' => 'Dutch', 'pl' => 'Polish',
         'th' => 'Thai', 'da' => 'Danish', 'fi' => 'Finnish', 'nb' => 'Norwegian',
+        'te' => 'Telugu',
     ];
 
     private const array ALLOWED_SORT = [
