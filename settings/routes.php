@@ -289,6 +289,7 @@ function addWebRoutes(RouterService $routerService, FastRoute\RouteCollector $ro
     ##########
     # Movies #
     ##########
+    $routes->add('GET', '/movies/catalog', [Web\MovieCatalogController::class, 'renderPage'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('GET', '/movies/search', [Web\MovieSearchController::class, 'search'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('POST', '/movies/{id:[0-9]+}/refresh-tmdb', [Web\Movie\MovieController::class, 'refreshTmdbData'], [Web\Middleware\UserIsAuthenticated::class]);
     $routes->add('POST', '/movies/{id:[0-9]+}/refresh-imdb', [Web\Movie\MovieController::class, 'refreshImdbRating'], [Web\Middleware\UserIsAuthenticated::class]);
@@ -326,6 +327,7 @@ function addWebRoutes(RouterService $routerService, FastRoute\RouteCollector $ro
     $routes->add('GET', '/users/{username:[a-zA-Z0-9]+}/movies', [Web\MoviesController::class, 'renderPage'], [Web\Middleware\IsAuthorizedToReadUserData::class]);
     $routes->add('GET', '/users/{username:[a-zA-Z0-9]+}/actors', [Web\ActorsController::class, 'renderPage'], [Web\Middleware\IsAuthorizedToReadUserData::class]);
     $routes->add('GET', '/users/{username:[a-zA-Z0-9]+}/directors', [Web\DirectorsController::class, 'renderPage'], [Web\Middleware\IsAuthorizedToReadUserData::class]);
+    $routes->add('GET', '/users/{username:[a-zA-Z0-9]+}/analytics', [Web\AnalyticsController::class, 'renderPage'], [Web\Middleware\IsAuthorizedToReadUserData::class]);
     // the following routes (/movies/ and /persons/) can have any non-slash characters following the URL after a -
     //   e.g., http://movary.test/users/alifeee/movies/14-freakier-friday which is identical to
     //         http://movary.test/users/alifeee/movies/14

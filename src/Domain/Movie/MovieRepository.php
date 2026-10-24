@@ -1360,6 +1360,33 @@ class MovieRepository
         return MovieEntity::createFromArray($data);
     }
 
+    public function fetchWatchCountPerMonth(int $userId) : array
+    {
+        if ($this->dbConnection->getDatabasePlatform() instanceof SqlitePlatform) {
+            return $this->dbConnection->fetchAllAssociative(
+                <<<SQL
+                SELECT strftime('%Y-%m', watched_at) as month, COUNT(*) as count
+                FROM movie_user_watch_dates
+                WHERE user_id = ? AND watched_at IS NOT NULL
+                GROUP BY strftime('%Y-%m', watched_at)
+                ORDER BY month ASC
+                SQL,
+                [$userId],
+            );
+        }
+
+        return $this->dbConnection->fetchAllAssociative(
+            <<<SQL
+            SELECT DATE_FORMAT(watched_at, '%Y-%m') as month, COUNT(*) as count
+            FROM movie_user_watch_dates
+            WHERE user_id = ? AND watched_at IS NOT NULL
+            GROUP BY DATE_FORMAT(watched_at, '%Y-%m')
+            ORDER BY month ASC
+            SQL,
+            [$userId],
+        );
+    }
+
     private function getMovieTitleSortExpression(MovieTitleDisplay $movieTitleDisplay) : string
     {
         if ($movieTitleDisplay->displaysOriginal() === true) {

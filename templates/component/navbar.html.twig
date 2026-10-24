@@ -29,6 +29,18 @@
                         Watchlist
                     </a>
                 </li>
+                {% if loggedIn == true %}
+                <li><a class="dropdown-item {% if requestUrlPath == '/movies/catalog' %}active{% endif %}"
+                       href="{{ applicationUrl }}/movies/catalog">
+                        Catalog
+                    </a>
+                </li>
+                <li><a class="dropdown-item {% if requestUrlPath matches '#\/analytics$#' %}active{% endif %}"
+                       href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/analytics">
+                        Analytics
+                    </a>
+                </li>
+                {% endif %}
                 <li><a class="dropdown-item {% if requestUrlPath matches '#\/.+\/movies#' %}active{% endif %}"
                        href="{{ applicationUrl }}/users/{{ routeUsername ?: currentUserName }}/movies">
                         All Movies</a>

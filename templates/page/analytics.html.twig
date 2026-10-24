@@ -1,0 +1,292 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Analytics{% endblock %}
+
+{% block stylesheets %}
+<style>
+.stat-card { border-radius: .5rem; padding: 1.2rem 1rem; text-align: center; }
+.stat-value { font-size: 2rem; font-weight: 700; line-height: 1; }
+.stat-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; opacity: .7; margin-top: .3rem; }
+.chart-box { background: var(--bs-body-bg); border: 1px solid var(--bs-border-color); border-radius: .5rem; padding: 1.25rem; }
+.rec-card { cursor: default; }
+.rec-card .rec-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.55);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: .4rem;
+    opacity: 0;
+    transition: opacity .15s ease;
+    border-radius: inherit;
+}
+.rec-card:hover .rec-overlay { opacity: 1; }
+.rec-badge { position: absolute; top: .4rem; right: .4rem; font-size: .7rem; }
+</style>
+{% endblock %}
+
+{% block body %}
+<main role="main" class="container">
+    {{ include('component/navbar.html.twig') }}
+
+    <div class="py-3">
+        <h2 class="mb-3">My Analytics</h2>
+
+        {# ── KPI row ── #}
+        <div class="row g-3 mb-4">
+            {% set kpis = [
+                {value: totalPlayCount, label: 'Total Plays', color: 'primary'},
+                {value: uniqueMoviesCount, label: 'Unique Movies', color: 'info'},
+                {value: totalHoursWatched ~ 'h', label: 'Hours Watched', color: 'success'},
+                {value: averagePersonalRating ?: '–', label: 'Avg Rating', color: 'warning'},
+                {value: averageRuntime ~ ' min', label: 'Avg Runtime', color: 'secondary'},
+            ] %}
+            {% for kpi in kpis %}
+            <div class="col-6 col-md-4 col-lg">
+                <div class="stat-card bg-{{ kpi.color }} bg-opacity-10 border border-{{ kpi.color }} border-opacity-25">
+                    <div class="stat-value text-{{ kpi.color }}">{{ kpi.value }}</div>
+                    <div class="stat-label">{{ kpi.label }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {# ── Trend + Rating row ── #}
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-lg-8">
+                <div class="chart-box h-100">
+                    <h6 class="mb-3">Watches per Month</h6>
+                    {% if watchPerMonth is empty %}
+                        <p class="text-muted small">No dated watch entries yet.</p>
+                    {% else %}
+                        <canvas id="trendChart" height="90"></canvas>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="chart-box h-100">
+                    <h6 class="mb-3">Your Rating Distribution</h6>
+                    {% if ratingDistribution is empty %}
+                        <p class="text-muted small">No ratings yet.</p>
+                    {% else %}
+                        <canvas id="ratingChart" height="200"></canvas>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ── Genre + Language + Release year row ── #}
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-5">
+                <div class="chart-box">
+                    <h6 class="mb-3">Top Genres</h6>
+                    {% if genres is empty %}
+                        <p class="text-muted small">No data yet.</p>
+                    {% else %}
+                        <canvas id="genreChart" height="220"></canvas>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="chart-box">
+                    <h6 class="mb-3">Languages</h6>
+                    {% if languages is empty %}
+                        <p class="text-muted small">No data yet.</p>
+                    {% else %}
+                        <canvas id="langChart" height="220"></canvas>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="chart-box">
+                    <h6 class="mb-3">Release Years (top {{ releaseYears|length }})</h6>
+                    {% if releaseYears is empty %}
+                        <p class="text-muted small">No data yet.</p>
+                    {% else %}
+                        <canvas id="yearChart" height="220"></canvas>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ── Recommendations ── #}
+        <h4 class="mb-2 mt-2">Recommended for You</h4>
+        <p class="text-muted small mb-3">Based on your top genre &amp; language — sorted by rating, unwatched first.</p>
+        {% if recommendations is empty %}
+            <p class="text-muted">No recommendations available.</p>
+        {% else %}
+        <div id="recAlert" class="mb-2"></div>
+        <div class="row row-cols-3 row-cols-md-4 row-cols-lg-5 row-cols-xxl-6 g-2">
+            {% for movie in recommendations %}
+            <div class="col">
+                <div class="card h-100 position-relative rec-card"
+                     title="{{ movie.title }}{% if movie.releaseYear %} ({{ movie.releaseYear }}){% endif %}">
+                    {% if movie.isWatched %}
+                        <span class="badge bg-secondary rec-badge">Watched</span>
+                    {% endif %}
+                    <span class="badge bg-warning text-dark rec-badge" style="{{ movie.isWatched ? 'top:1.6rem' : '' }}">★ {{ movie.voteAverage }}</span>
+                    {% if movie.posterUrl %}
+                        <img src="{{ movie.posterUrl }}" class="card-img-top card-img-bottom object-fit-cover h-100"
+                             alt="{{ movie.title }} Poster" loading="lazy">
+                    {% else %}
+                        <div class="card-body d-flex align-items-center justify-content-center text-muted" style="min-height:180px">
+                            <span class="small text-center">{{ movie.title }}</span>
+                        </div>
+                    {% endif %}
+                    <div class="rec-overlay">
+                        <button class="btn btn-sm w-75 {{ movie.isWatched ? 'btn-secondary' : 'btn-success' }}"
+                                onclick="recToggleWatched({{ movie.tmdbId }}, {{ movie.movaryId ?: 'null' }}, '{{ currentUserName }}', this)"
+                                data-watched="{{ movie.isWatched ? '1' : '0' }}"
+                        ><i class="bi bi-check-lg"></i> {{ movie.isWatched ? 'Watched ✕' : 'Mark watched' }}</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous"></script>
+<script>
+const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+    || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        && document.documentElement.getAttribute('data-theme') !== 'light')
+const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'
+const labelColor = isDark ? '#ccc' : '#555'
+const accentBlue  = '#4e8ef7'
+const accentPalette = ['#4e8ef7','#f7934e','#4ef7a3','#f74e8e','#a34ef7','#f7e04e','#4ef7f0','#f74e4e','#8ef74e','#c08af7']
+
+Chart.defaults.color = labelColor
+Chart.defaults.borderColor = gridColor
+
+{% if watchPerMonth is not empty %}
+;(function(){
+    const labels = {{ watchPerMonth|map(r => r.month)|json_encode|raw }}
+    const data   = {{ watchPerMonth|map(r => r.count)|json_encode|raw }}
+    new Chart(document.getElementById('trendChart'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Watches', data, backgroundColor: accentBlue, borderRadius: 3 }] },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { maxTicksLimit: 12, maxRotation: 45 } },
+                y: { grid: { color: gridColor }, ticks: { precision: 0 } },
+            },
+        },
+    })
+})()
+{% endif %}
+
+{% if ratingDistribution is not empty %}
+;(function(){
+    const labels = {{ ratingDistribution|map(r => r.rating)|json_encode|raw }}
+    const data   = {{ ratingDistribution|map(r => r.count)|json_encode|raw }}
+    new Chart(document.getElementById('ratingChart'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Movies', data, backgroundColor: '#f7e04e', borderRadius: 3 }] },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: gridColor }, ticks: { precision: 0 } },
+            },
+        },
+    })
+})()
+{% endif %}
+
+{% if genres is not empty %}
+;(function(){
+    const labels = {{ genres|map(g => g.name)|json_encode|raw }}
+    const data   = {{ genres|map(g => g.count)|json_encode|raw }}
+    new Chart(document.getElementById('genreChart'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Movies', data, backgroundColor: accentPalette, borderRadius: 3 }] },
+        options: {
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { color: gridColor }, ticks: { precision: 0 } },
+                y: { grid: { display: false } },
+            },
+        },
+    })
+})()
+{% endif %}
+
+{% if languages is not empty %}
+;(function(){
+    const labels = {{ languages|map(l => l.name)|json_encode|raw }}
+    const data   = {{ languages|map(l => l.count)|json_encode|raw }}
+    new Chart(document.getElementById('langChart'), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: accentPalette, borderWidth: 1 }] },
+        options: {
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+        },
+    })
+})()
+{% endif %}
+
+{% if releaseYears is not empty %}
+;(function(){
+    const sorted = {{ releaseYears|sort((a, b) => a.name <=> b.name)|map(r => {name: r.name, count: r.count})|json_encode|raw }}
+    const labels = sorted.map(r => r.name)
+    const data   = sorted.map(r => r.count)
+    new Chart(document.getElementById('yearChart'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Movies', data, backgroundColor: '#4ef7a3', borderRadius: 3 }] },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false }, ticks: { maxRotation: 45 } },
+                y: { grid: { color: gridColor }, ticks: { precision: 0 } },
+            },
+        },
+    })
+})()
+{% endif %}
+
+async function recToggleWatched(tmdbId, movaryId, username, btn) {
+    btn.disabled = true
+    const isWatched = btn.dataset.watched === '1'
+    try {
+        let response
+        if (isWatched && movaryId) {
+            response = await fetchWithCsrf(APPLICATION_URL + '/users/' + username + '/movies/' + movaryId + '/history', {
+                method: 'DELETE',
+                headers: {'Content-type': 'application/json'},
+                body: JSON.stringify({dateFormat: document.getElementById('dateFormatPhp').value})
+            })
+        } else {
+            response = await fetchWithCsrf(APPLICATION_URL + '/log-movie', {
+                method: 'post',
+                headers: {'Content-type': 'application/json'},
+                body: JSON.stringify({
+                    tmdbId: tmdbId,
+                    watchDate: getCurrentDate(),
+                    dateFormat: document.getElementById('dateFormatPhp').value,
+                    personalRating: 0,
+                    comment: '',
+                    locationId: '',
+                    postToMastodon: false,
+                })
+            })
+        }
+        if (response.status === 200 || response.status === 204) {
+            const nowWatched = !isWatched
+            btn.dataset.watched = nowWatched ? '1' : '0'
+            btn.classList.replace(nowWatched ? 'btn-success' : 'btn-secondary', nowWatched ? 'btn-secondary' : 'btn-success')
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> ' + (nowWatched ? 'Watched ✕' : 'Mark watched')
+        } else {
+            addAlert('recAlert', 'Something went wrong. Please try again.', 'danger')
+        }
+    } catch (e) {
+        addAlert('recAlert', 'Something went wrong. Please try again.', 'danger')
+    }
+    btn.disabled = false
+}
+</script>
+{% endblock %}

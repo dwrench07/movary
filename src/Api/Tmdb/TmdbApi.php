@@ -78,6 +78,54 @@ class TmdbApi
         );
     }
 
+    public function fetchPopularMovies(?int $page = null) : array
+    {
+        $params = [];
+        if ($page !== null) {
+            $params['page'] = (string)$page;
+        }
+
+        return $this->client->get('/movie/popular', $params);
+    }
+
+    public function searchPerson(string $name) : array
+    {
+        return $this->client->get('/search/person', ['query' => urlencode($name)]);
+    }
+
+    public function fetchMoviesByPersonId(int $personId, ?int $page = null) : array
+    {
+        $params = ['with_cast' => (string)$personId, 'sort_by' => 'popularity.desc'];
+        if ($page !== null) {
+            $params['page'] = (string)$page;
+        }
+
+        return $this->client->get('/discover/movie', $params);
+    }
+
+    public function discoverMovies(array $filters, string $sortBy = 'popularity.desc', ?int $page = null) : array
+    {
+        $params = array_merge($filters, ['sort_by' => $sortBy]);
+        if ($page !== null) {
+            $params['page'] = (string)$page;
+        }
+
+        return $this->client->get('/discover/movie', $params);
+    }
+
+    public function fetchMoviesByYear(int $year, string $sortBy = 'popularity.desc', ?int $page = null) : array
+    {
+        $params = [
+            'primary_release_year' => (string)$year,
+            'sort_by' => $sortBy,
+        ];
+        if ($page !== null) {
+            $params['page'] = (string)$page;
+        }
+
+        return $this->client->get('/discover/movie', $params);
+    }
+
     /** searchMovie — directly exposes data in TMDB format to frontend given a search query */
     public function searchMovie(string $searchTerm, ?Year $year = null, ?int $page = null) : array
     {

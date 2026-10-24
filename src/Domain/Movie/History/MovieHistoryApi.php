@@ -344,6 +344,11 @@ class MovieHistoryApi
         return $this->movieRepository->fetchTopLocations($userId);
     }
 
+    public function fetchWatchCountPerMonth(int $userId) : array
+    {
+        return $this->movieRepository->fetchWatchCountPerMonth($userId);
+    }
+
     public function fetchTotalHoursWatched(int $userId) : int
     {
         $minutes = $this->movieRepository->fetchTotalMinutesWatched($userId);

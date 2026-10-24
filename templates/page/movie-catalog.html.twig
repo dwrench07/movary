@@ -1,0 +1,285 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Movie Catalog{% endblock %}
+
+{% block stylesheets %}
+<style>
+.catalog-card { cursor: default; }
+.catalog-card .catalog-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.55);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: .5rem;
+    opacity: 0;
+    transition: opacity .15s ease;
+    border-radius: inherit;
+}
+.catalog-card:hover .catalog-overlay { opacity: 1; }
+</style>
+{% endblock %}
+
+{% block body %}
+    <main role="main" class="container">
+        {{ include('component/navbar.html.twig') }}
+
+        <div style="text-align: center;">
+            <h2 style="padding: 1rem 0 0.5rem">
+                {% if actorName %}Movies with {{ actorName }}
+                {% elseif directorName %}Directed by {{ directorName }}
+                {% elseif selectedYear %}{{ selectedYear }} Movies
+                {% else %}Popular Movies{% endif %}
+            </h2>
+
+            {# ── Filter form ── #}
+            <form id="catalogFilterForm" method="get" action="{{ applicationUrl }}/movies/catalog"
+                  class="mb-3 p-3 border rounded text-start" style="background:var(--bs-body-bg)">
+                <input type="hidden" name="p" value="1">
+                <input type="hidden" name="actorId"    id="hiddenActorId"    value="{{ actorId ?: '' }}">
+                <input type="hidden" name="directorId" id="hiddenDirectorId" value="{{ directorId ?: '' }}">
+
+                <div class="row g-2 mb-2">
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm mb-1">Year</label>
+                        <select name="year" class="form-select form-select-sm" onchange="submitFilters()">
+                            <option value="">Any</option>
+                            {% for y in currentYear..1900 %}
+                                <option value="{{ y }}" {{ selectedYear == y ? 'selected' : '' }}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm mb-1">Genre</label>
+                        <select name="genre" class="form-select form-select-sm" onchange="submitFilters()">
+                            <option value="">Any</option>
+                            {% for id, name in genres %}
+                                <option value="{{ id }}" {{ selectedGenre == id ? 'selected' : '' }}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm mb-1">Language</label>
+                        <select name="lang" class="form-select form-select-sm" onchange="submitFilters()">
+                            <option value="">Any</option>
+                            {% for code, label in languages %}
+                                <option value="{{ code }}" {{ selectedLanguage == code ? 'selected' : '' }}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm mb-1">Min rating</label>
+                        <select name="minRating" class="form-select form-select-sm" onchange="submitFilters()">
+                            <option value="">Any</option>
+                            <option value="6" {{ minRating == 6 ? 'selected' : '' }}>6+</option>
+                            <option value="7" {{ minRating == 7 ? 'selected' : '' }}>7+</option>
+                            <option value="8" {{ minRating == 8 ? 'selected' : '' }}>8+</option>
+                            <option value="9" {{ minRating == 9 ? 'selected' : '' }}>9+</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm mb-1">Runtime</label>
+                        <select name="runtime" class="form-select form-select-sm" onchange="submitFilters()">
+                            <option value="">Any</option>
+                            <option value="short"  {{ runtime == 'short'  ? 'selected' : '' }}>&lt; 90 min</option>
+                            <option value="medium" {{ runtime == 'medium' ? 'selected' : '' }}>90–120 min</option>
+                            <option value="long"   {{ runtime == 'long'   ? 'selected' : '' }}>120–150 min</option>
+                            <option value="epic"   {{ runtime == 'epic'   ? 'selected' : '' }}>&gt; 150 min</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm mb-1">Sort</label>
+                        <select name="sort" class="form-select form-select-sm" onchange="submitFilters()">
+                            <option value="popularity.desc"     {{ sortBy == 'popularity.desc'    ? 'selected' : '' }}>Popular</option>
+                            <option value="release_date.asc"   {{ sortBy == 'release_date.asc'   ? 'selected' : '' }}>Release ↑</option>
+                            <option value="release_date.desc"  {{ sortBy == 'release_date.desc'  ? 'selected' : '' }}>Release ↓</option>
+                            <option value="original_title.asc" {{ sortBy == 'original_title.asc' ? 'selected' : '' }}>Title A–Z</option>
+                            <option value="vote_average.desc"  {{ sortBy == 'vote_average.desc'  ? 'selected' : '' }}>Rating ↓</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label form-label-sm mb-1"><i class="bi bi-person-fill"></i> Actor</label>
+                        <input type="text" name="actor" class="form-control form-control-sm"
+                               placeholder="e.g. Tom Hanks"
+                               value="{{ actorName ?: '' }}"
+                               oninput="document.getElementById('hiddenActorId').value=''">
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label form-label-sm mb-1"><i class="bi bi-camera-video-fill"></i> Director</label>
+                        <input type="text" name="director" class="form-control form-control-sm"
+                               placeholder="e.g. Christopher Nolan"
+                               value="{{ directorName ?: '' }}"
+                               oninput="document.getElementById('hiddenDirectorId').value=''">
+                    </div>
+                    <div class="col-6 col-md-1">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Search</button>
+                    </div>
+                    <div class="col-6 col-md-1">
+                        <a href="{{ applicationUrl }}/movies/catalog" class="btn btn-outline-secondary btn-sm w-100">Clear</a>
+                    </div>
+                </div>
+            </form>
+
+            <p class="text-muted small mb-2">{{ totalResults|number_format }} movies found</p>
+
+            <div id="catalogAlert" class="mb-2"></div>
+
+            <div class="poster-grid row row-cols-3 row-cols-md-3 row-cols-lg-5 row-cols-xxl-6">
+                {% for movie in movies %}
+                    <div class="col">
+                        <div class="card h-100 position-relative catalog-card"
+                             title="{{ movie.title }}{% if movie.releaseYear %} ({{ movie.releaseYear }}){% endif %}">
+                            {% if movie.posterUrl %}
+                                <img src="{{ movie.posterUrl }}" class="card-img-top card-img-bottom object-fit-cover h-100"
+                                     alt="{{ movie.title }} Poster" loading="lazy">
+                            {% else %}
+                                <div class="card-body d-flex align-items-center justify-content-center text-muted" style="min-height:200px">
+                                    <span>{{ movie.title }}</span>
+                                </div>
+                            {% endif %}
+                            <div class="catalog-overlay">
+                                <button class="btn btn-sm w-75 {{ movie.isWatched ? 'btn-secondary' : 'btn-success' }}"
+                                        onclick="catalogToggleWatched({{ movie.tmdbId }}, {{ movie.movaryId ?: 'null' }}, '{{ currentUserName }}', this)"
+                                        data-watched="{{ movie.isWatched ? '1' : '0' }}"
+                                ><i class="bi bi-check-lg"></i> {{ movie.isWatched ? 'Watched ✕' : 'Mark watched' }}</button>
+                                <button class="btn btn-sm w-75 {{ movie.isOnWatchlist ? 'btn-light' : 'btn-outline-light' }}"
+                                        onclick="catalogToggleWatchlist({{ movie.tmdbId }}, {{ movie.movaryId ?: 'null' }}, this)"
+                                        data-watchlisted="{{ movie.isOnWatchlist ? '1' : '0' }}"
+                                ><i class="bi bi-bookmark{{ movie.isOnWatchlist ? '-check' : '' }}"></i> {{ movie.isOnWatchlist ? 'Watchlist ✕' : 'Watchlist' }}</button>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="d-flex justify-content-center align-items-center gap-2 mt-3 mb-1">
+                <label for="gotoPageInput" class="mb-0 text-muted small">Go to page</label>
+                <input id="gotoPageInput" type="number" min="1" max="{{ paginationElements.maxPage }}"
+                       class="form-control form-control-sm" style="width:5rem"
+                       onkeydown="if(event.key==='Enter')gotoPage({{ paginationElements.maxPage }})">
+                <button class="btn btn-sm btn-outline-secondary" onclick="gotoPage({{ paginationElements.maxPage }})">Go</button>
+            </div>
+
+            {% set baseUrl = applicationUrl ~ '/movies/catalog?' %}
+            {% if selectedYear %}{% set baseUrl = baseUrl ~ 'year=' ~ selectedYear ~ '&' %}{% endif %}
+            {% if sortBy != 'popularity.desc' %}{% set baseUrl = baseUrl ~ 'sort=' ~ sortBy ~ '&' %}{% endif %}
+            {% if selectedGenre %}{% set baseUrl = baseUrl ~ 'genre=' ~ selectedGenre ~ '&' %}{% endif %}
+            {% if selectedLanguage %}{% set baseUrl = baseUrl ~ 'lang=' ~ selectedLanguage ~ '&' %}{% endif %}
+            {% if minRating %}{% set baseUrl = baseUrl ~ 'minRating=' ~ minRating ~ '&' %}{% endif %}
+            {% if runtime %}{% set baseUrl = baseUrl ~ 'runtime=' ~ runtime ~ '&' %}{% endif %}
+            {% if actorId %}{% set baseUrl = baseUrl ~ 'actorId=' ~ actorId ~ '&actor=' ~ (actorName|url_encode) ~ '&' %}{% endif %}
+            {% if directorId %}{% set baseUrl = baseUrl ~ 'directorId=' ~ directorId ~ '&director=' ~ (directorName|url_encode) ~ '&' %}{% endif %}
+
+            <ul class="pagination justify-content-center mt-3">
+                {% if paginationElements.previous is null %}
+                    <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+                    <li class="page-item disabled"><span class="page-link">&lsaquo;</span></li>
+                {% else %}
+                    <li class="page-item"><a class="page-link" href="{{ baseUrl }}p=1">&laquo;</a></li>
+                    <li class="page-item"><a class="page-link" href="{{ baseUrl }}p={{ paginationElements.previous }}">&lsaquo;</a></li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link">{{ paginationElements.currentPage }} of {{ paginationElements.maxPage }}</span>
+                </li>
+                {% if paginationElements.next is null %}
+                    <li class="page-item disabled"><span class="page-link">&rsaquo;</span></li>
+                    <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                {% else %}
+                    <li class="page-item"><a class="page-link" href="{{ baseUrl }}p={{ paginationElements.next }}">&rsaquo;</a></li>
+                    <li class="page-item"><a class="page-link" href="{{ baseUrl }}p={{ paginationElements.maxPage }}">&raquo;</a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function submitFilters() {
+    document.getElementById('catalogFilterForm').submit()
+}
+
+function gotoPage(maxPage) {
+    const p = parseInt(document.getElementById('gotoPageInput').value)
+    if (isNaN(p) || p < 1 || p > maxPage) return
+    const params = new URLSearchParams(window.location.search)
+    params.set('p', p)
+    window.location = APPLICATION_URL + '/movies/catalog?' + params.toString()
+}
+
+async function catalogToggleWatched(tmdbId, movaryId, username, btn) {
+    btn.disabled = true
+    const isWatched = btn.dataset.watched === '1'
+    try {
+        let response
+        if (isWatched && movaryId) {
+            response = await fetchWithCsrf(APPLICATION_URL + '/users/' + username + '/movies/' + movaryId + '/history', {
+                method: 'DELETE',
+                headers: {'Content-type': 'application/json'},
+                body: JSON.stringify({dateFormat: document.getElementById('dateFormatPhp').value})
+            })
+        } else {
+            response = await fetchWithCsrf(APPLICATION_URL + '/log-movie', {
+                method: 'post',
+                headers: {'Content-type': 'application/json'},
+                body: JSON.stringify({
+                    tmdbId: tmdbId,
+                    watchDate: getCurrentDate(),
+                    dateFormat: document.getElementById('dateFormatPhp').value,
+                    personalRating: 0,
+                    comment: '',
+                    locationId: '',
+                    postToMastodon: false,
+                })
+            })
+        }
+        if (response.status === 200 || response.status === 204) {
+            const nowWatched = !isWatched
+            btn.dataset.watched = nowWatched ? '1' : '0'
+            btn.classList.replace(nowWatched ? 'btn-success' : 'btn-secondary', nowWatched ? 'btn-secondary' : 'btn-success')
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> ' + (nowWatched ? 'Watched ✕' : 'Mark watched')
+        } else {
+            addAlert('catalogAlert', 'Something went wrong. Please try again.', 'danger')
+        }
+    } catch (e) {
+        addAlert('catalogAlert', 'Something went wrong. Please try again.', 'danger')
+    }
+    btn.disabled = false
+}
+
+async function catalogToggleWatchlist(tmdbId, movaryId, btn) {
+    btn.disabled = true
+    const isWatchlisted = btn.dataset.watchlisted === '1'
+    try {
+        let response
+        if (isWatchlisted && movaryId) {
+            response = await fetchWithCsrf(APPLICATION_URL + '/movies/' + movaryId + '/remove-watchlist', {method: 'DELETE'})
+        } else {
+            response = await fetchWithCsrf(APPLICATION_URL + '/add-movie-to-watchlist', {
+                method: 'post',
+                headers: {'Content-type': 'application/json'},
+                body: JSON.stringify({tmdbId: tmdbId})
+            })
+        }
+        if (response.status === 200 || response.status === 204) {
+            const nowWatchlisted = !isWatchlisted
+            btn.dataset.watchlisted = nowWatchlisted ? '1' : '0'
+            if (nowWatchlisted) {
+                btn.classList.replace('btn-outline-light', 'btn-light')
+                btn.innerHTML = '<i class="bi bi-bookmark-check"></i> Watchlist ✕'
+            } else {
+                btn.classList.replace('btn-light', 'btn-outline-light')
+                btn.innerHTML = '<i class="bi bi-bookmark"></i> Watchlist'
+            }
+        } else {
+            addAlert('catalogAlert', 'Something went wrong. Please try again.', 'danger')
+        }
+    } catch (e) {
+        addAlert('catalogAlert', 'Something went wrong. Please try again.', 'danger')
+    }
+    btn.disabled = false
+}
+</script>
+{% endblock %}
